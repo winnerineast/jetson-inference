@@ -23,8 +23,15 @@ endif()
 
 
 # setup tensorRT flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")	# -std=gnu++11
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wno-write-strings")	# -std=gnu++11
 set(BUILD_DEPS "YES" CACHE BOOL "If YES, will install dependencies into sandbox.  Automatically reset to NO after dependencies are installed.")
+
+
+# copy configuration tools to build dir
+file(COPY "tools/download-models.sh" DESTINATION ${PROJECT_BINARY_DIR})
+file(COPY "tools/download-models.rc" DESTINATION ${PROJECT_BINARY_DIR})
+file(COPY "tools/install-pytorch.sh" DESTINATION ${PROJECT_BINARY_DIR})
+file(COPY "tools/install-pytorch.rc" DESTINATION ${PROJECT_BINARY_DIR})
 
 
 # if this is the first time running cmake, perform pre-build dependency install script (or if the user manually triggers re-building the dependencies)
@@ -41,6 +48,7 @@ endif()
 
 
 # setup CUDA
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/utils/cuda" )
 find_package(CUDA)
 message("-- CUDA version: ${CUDA_VERSION}")
 
@@ -66,7 +74,6 @@ if(CUDA_VERSION_MAJOR GREATER 9)
 	find_package(OpenCV 3.0.0 COMPONENTS core calib3d REQUIRED)
 endif()
 
-
 # setup project output paths
 set(PROJECT_OUTPUT_DIR  ${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_PROCESSOR})
 set(PROJECT_INCLUDE_DIR ${PROJECT_OUTPUT_DIR}/include)
@@ -82,67 +89,54 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_OUTPUT_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_OUTPUT_DIR}/lib)
 
 
-# build C/C++ interface
-include_directories(${PROJECT_INCLUDE_DIR} ${GIE_PATH}/include)
+# build C/C++ library
+include_directories(${PROJECT_INCLUDE_DIR} ${PROJECT_INCLUDE_DIR}/jetson-inference ${PROJECT_INCLUDE_DIR}/jetson-utils)
 include_directories(/usr/include/gstreamer-1.0 /usr/lib/aarch64-linux-gnu/gstreamer-1.0/include /usr/include/glib-2.0 /usr/include/libxml2 /usr/lib/aarch64-linux-gnu/glib-2.0/include/)
 
-file(GLOB inferenceSources *.cpp *.cu calibration/*.cpp)
-file(GLOB inferenceIncludes *.h calibration/*.h)
+file(GLOB inferenceSources c/*.cpp c/*.cu calibration/*.cpp plugins/*.cpp)
+file(GLOB inferenceIncludes c/*.h c/*.cuh calibration/*.h)
 
 cuda_add_library(jetson-inference SHARED ${inferenceSources})
 #target_link_libraries(jetson-inference nvcaffe_parser nvinfer)		# gstreamer-0.10 gstbase-0.10 gstapp-0.10 
 
 
 # transfer all headers to the include directory
+file(MAKE_DIRECTORY ${PROJECT_INCLUDE_DIR}/jetson-inference)
+
 foreach(include ${inferenceIncludes})
 	message("-- Copying ${include}")
-	configure_file(${include} ${PROJECT_INCLUDE_DIR} COPYONLY)
+	configure_file(${include} ${PROJECT_INCLUDE_DIR}/jetson-inference COPYONLY)
 endforeach()
 
 
-# create symbolic link for network data
+# create symbolic link for network and image data
 execute_process( COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "${PROJECT_SOURCE_DIR}/data/networks" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/networks" )
+execute_process( COMMAND "${CMAKE_COMMAND}" "-E" "create_symlink" "${PROJECT_SOURCE_DIR}/data/images" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/images" )
+
   
-  
-# copy image data
-file(GLOB imageData ${PROJECT_SOURCE_DIR}/data/images/*)
+# copy image data (EDIT: these are now symlinked above)
+#file(GLOB imageData ${PROJECT_SOURCE_DIR}/data/images/*)
 
-foreach(image ${imageData})
-	message("-- Copying ${image}")
-	file(COPY ${image} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-	#configure_file(${include} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} COPYONLY)
-endforeach()
-
-
-# copy tools
-file(COPY "tools/segnet-batch.sh" DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+#foreach(image ${imageData})
+#	message("-- Copying ${image}")
+#	file(COPY ${image} DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+#	#configure_file(${include} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} COPYONLY)
+#endforeach()
 
 
-# build samples & utilities
-add_subdirectory(imagenet-console)
-add_subdirectory(imagenet-camera)
-
-add_subdirectory(detectnet-console)
-add_subdirectory(detectnet-camera)
-
-add_subdirectory(segnet-console)
-add_subdirectory(segnet-camera)
-
-add_subdirectory(trt-bench)
-add_subdirectory(trt-console)
-
+# build subdirectories
 add_subdirectory(docs)
+add_subdirectory(examples)
+add_subdirectory(tools)
 add_subdirectory(utils)
+add_subdirectory(python)
 
-target_link_libraries(jetson-inference jetson-utils nvinfer nvcaffe_parser)
+
+# set linker options
+target_link_libraries(jetson-inference jetson-utils nvinfer nvinfer_plugin nvcaffe_parser)
 
 if(CUDA_VERSION_MAJOR GREATER 9)
 	target_link_libraries(jetson-inference nvonnxparser opencv_core opencv_calib3d)
-
-	add_subdirectory(homography-console)
-	add_subdirectory(homography-camera)
-
-	add_subdirectory(superres-console)
 endif()
 
 
@@ -151,12 +145,16 @@ foreach(include ${inferenceIncludes})
     install(FILES "${include}" DESTINATION include/jetson-inference)
 endforeach()
 
-# install symlink to networks
+# install symlink to networks and images
 install(CODE "execute_process( COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/data/networks ${CMAKE_INSTALL_PREFIX}/bin/networks )" )
+install(CODE "execute_process( COMMAND ${CMAKE_COMMAND} -E create_symlink ${PROJECT_SOURCE_DIR}/data/images ${CMAKE_INSTALL_PREFIX}/bin/images )" )
 
 # install the shared library
 install(TARGETS jetson-inference DESTINATION lib EXPORT jetson-inferenceConfig)
 
 # install the cmake project, for importing
 install(EXPORT jetson-inferenceConfig DESTINATION share/jetson-inference/cmake)
+
+# run ldconfig after installing
+install(CODE "execute_process( COMMAND ldconfig )")
 

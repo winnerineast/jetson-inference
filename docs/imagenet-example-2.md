@@ -1,9 +1,9 @@
 <img src="https://github.com/dusty-nv/jetson-inference/raw/master/docs/images/deep-vision-header.jpg">
-<p align="right"><sup><a href="imagenet-console-2.md">Back</a> | <a href="imagenet-camera-2.md">Next</a> | </sup><a href="../README.md#hello-ai-world-inference-only"><sup>Contents</sup></a>
+<p align="right"><sup><a href="imagenet-example-python-2.md">Back</a> | <a href="imagenet-camera-2.md">Next</a> | </sup><a href="../README.md#hello-ai-world"><sup>Contents</sup></a>
 <br/>
 <sup>Image Recognition</sup></p>  
 
-# Coding Your Own Image Recognition Program
+# Coding Your Own Image Recognition Program (C++)
 In the previous step, we ran an application that came with the jetson-inference repo.  
 
 Now, we're going to walk through creating a new program from scratch for image recognition called [`my-recognition`](../examples/my-recognition/my-recognition.cpp).  This program will be able to exist as a standalone project outside the repo, hence if you wish to use the jetson-inference library in your own projects and applications, you can follow this example.  
@@ -36,7 +36,7 @@ Next, we'll add the code for the program to the empty source files we created he
 
 Open up `my-recognition.cpp` in your editor of choice (or run `gedit my-recognition.cpp`).  
 
-Let's start adding the necessary code to use the [`imageNet`](../imageNet.h) class for recognizing images.
+Let's start adding the necessary code to use the [`imageNet`](../c/imageNet.h) class for recognizing images.
 
 #### Includes
 
@@ -49,8 +49,8 @@ First, include a couple of headers that we'll need:
 // include loadImage header for loading images
 #include <jetson-utils/loadImage.h>
 ```
-> **note**:  these headers are installed under `/usr/local/include` during the `sudo make install` step of [building the repo](building-repo-2.md#compiling-the-project)  
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if you did not run `sudo make install`, then these headers won't be found when we go to compile the example.  
+> **note**:  these headers are installed under `/usr/local/include` during the `sudo make install` step of [the build](building-repo-2.md#compiling-the-project).  
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if you did not run `sudo make install`, then these headers won't be found when we compile the example.  
 
 #### Declaring main() and Parsing the Command Line
 
@@ -110,11 +110,11 @@ The image is loaded in `float4` RGBA format, with pixel values between 0.0 and 2
 
 #### Loading the Image Recognition Network
 
-Using the [`imageNet::Create()`](../imageNet.h#L70) function, the following code will load the GoogleNet model with TensorRT, which was already downloaded when you initially [built the jetson-inference repo](building-repo-2.md#compiling-the-project).  The model is pre-trained on the ImageNet ILSVRC12 dataset, which can recognize up to [1000 different classes](../data/networks/ilsvrc12_synset_words.txt) of objects, like different kinds of fruits and vegetables, many different species of animals, along with everyday man-made objects like vehicles, office furniture, sporting equipment, ect.   
+Using the [`imageNet::Create()`](../c/imageNet.h#L70) function, the following code will load the GoogleNet model with TensorRT, which was already downloaded when you initially [built the `jetson-inference` repo](building-repo-2.md#downloading-models).  The model is pre-trained on the ImageNet ILSVRC12 dataset, which can recognize up to [1000 different classes](../data/networks/ilsvrc12_synset_words.txt) of objects, like different kinds of fruits and vegetables, many different species of animals, along with everyday man-made objects like vehicles, office furniture, sporting equipment, ect.   
 
 ``` cpp
 	// load the GoogleNet image recognition network with TensorRT
-	// you can use imageNet::ALEXNET to load AlexNet model instead
+	// you can use imageNet::RESNET_18 to load ResNet-18 instead
 	imageNet* net = imageNet::Create(imageNet::GOOGLENET);
 
 	// check to make sure that the network model loaded properly
@@ -125,13 +125,12 @@ Using the [`imageNet::Create()`](../imageNet.h#L70) function, the following code
 	}
 ```
 
-If desired, you can load the AlexNet model instead of GoogleNet by calling [`imageNet::Create(imageNet::ALEXNET)`](../imageNet.h#L70).  
+If desired, you can load other pre-trained models by changing the enum passed to `imageNet::Create()` to one of the ones listed in [this table](imagenet-console-2.md#downloading-other-classification-models).  ResNet-18 (`imageNet::RESNET_18`) is available by default to use along with GoogleNet.  For the others, you may need to go back and [download](imagenet-console-2.md#downloading-other-classification-models) models that you didn't initially select during the build process.
 
-The AlexNet model is also trained on the same 1000 classes of objects from ILSVRC12.  
 
 #### Classifying the Image
 
-Next, we are going to classify the image with the image recognition network using the [`imageNet::Classify()`](../imageNet.h#L103) function:  
+Next, we are going to classify the image with the image recognition network using the [`imageNet::Classify()`](../c/imageNet.h#L103) function:  
 
 ``` cpp
 	// this variable will store the confidence of the classification (between 0 and 1)
@@ -142,13 +141,13 @@ Next, we are going to classify the image with the image recognition network usin
 	const int classIndex = net->Classify(imgCUDA, imgWidth, imgHeight, &confidence);
 ```
 
-[`imageNet::Classify()`](../imageNet.h#L103) accepts an image pointer in GPU memory, and performs the inferencing with TensorRT.  
+[`imageNet::Classify()`](../c/imageNet.h#L103) accepts an image pointer in GPU memory, and performs the inferencing with TensorRT.  
 
 It returns the index of the object class that the image was recognized as, along with the confidence value of the result.
 
 #### Interpreting the Results
 
-Unless the call to [`imageNet::Classify()`](../imageNet.h#L103) resulted in an error, let's print out the classification info of the recognized object:   
+Unless the call to [`imageNet::Classify()`](../c/imageNet.h#L103) resulted in an error, let's print out the classification info of the recognized object:   
 
 ``` cpp
 	// make sure a valid classification result was returned	
@@ -168,7 +167,7 @@ Unless the call to [`imageNet::Classify()`](../imageNet.h#L103) resulted in an e
 	}
 ```
 
-Since [`imageNet::Classify()`](../imageNet.h#L103) returns an integer-based index of the object class (between 0 and 1000 for ILSVRC12), we use the [`imageNet::GetClassDesc()`](../imageNet.h#L140) function to retrieve a human-readable description of the object.  
+Since [`imageNet::Classify()`](../c/imageNet.h#L103) returns an integer-based index of the object class (between 0 and 1000 for ILSVRC12), we use the [`imageNet::GetClassDesc()`](../c/imageNet.h#L140) function to retrieve a human-readable description of the object.  
 
 These descriptions of the 1000 classes are parsed from [`ilsvrc12_synset_words.txt`](../data/networks/ilsvrc12_synset_words.txt) when the network gets loaded (this file was previously downloaded when the jetson-inference repo was built).  
 
@@ -233,8 +232,8 @@ In the future you can use this CMakeLists as a template for compiling your own p
 		target_link_libraries(my-recognition jetson-inference)
 	```
 
-> **note**:  these libraries are installed under `/usr/local/lib` during the `sudo make install` step of [building the repo](building-repo-2.md#compiling-the-project)  
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if you did not run `sudo make install`, then these libraries won't be found when we go to compile the example.  
+> **note**:  these libraries are installed under `/usr/local/lib` during the `sudo make install` step of [the build](building-repo-2.md#compiling-the-project).  
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if you did not run `sudo make install`, then these libraries won't be found when we compile the example.  
 
 ## Building the Example
 
@@ -277,5 +276,5 @@ This is the conclusion of this section of the tutorial.  Next, we'll classify a 
 ##
 <p align="right">Next | <b><a href="imagenet-camera-2.md">Running the Live Camera Recognition Demo</a></b>
 <br/>
-Back | <b><a href="imagenet-console-2.md">Classifying Images with ImageNet</a></b></p>
-<p align="center"><sup>© 2016-2019 NVIDIA | </sup><a href="../README.md#hello-ai-world-inference-only"><sup>Table of Contents</sup></a></p>
+Back | <b><a href="imagenet-example-python-2.md">Coding Your Own Image Recognition Program (Python)</a></b></p>
+<p align="center"><sup>© 2016-2019 NVIDIA | </sup><a href="../README.md#hello-ai-world"><sup>Table of Contents</sup></a></p>

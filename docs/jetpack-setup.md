@@ -1,11 +1,11 @@
 <img src="https://github.com/dusty-nv/jetson-inference/raw/master/docs/images/deep-vision-header.jpg">
-<p align="right"><sup><a href="digits-setup.md">Back</a> | <a href="building-repo.md">Next</a> | </sup><a href="../README.md#two-days-to-a-demo-training--inference"><sup>Contents</sup></a>
+<p align="right"><sup><a href="digits-setup.md">Back</a> | <a href="building-repo.md">Next</a> | </sup><a href="../README.md#two-days-to-a-demo-digits"><sup>Contents</sup></a>
 <br/>
 <sup>System Setup</sup></p> 
 
 # Setting up Jetson with JetPack
 
-> **note**:  if your Jetson has already been setup with JetPack, you can skip this step and continue to [`Building the Repo`](building-repo.md)
+> **note**:  if your Jetson Nano has already been setup with the [SD card image](https://developer.nvidia.com/embedded/learn/get-started-jetson-nano-devkit#write) (which includes the JetPack components), or your Jetson has already been setup with JetPack, you can skip this step and continue to [`Building the Repo`](building-repo.md)
 
 Download the latest **[JetPack](https://developer.nvidia.com/embedded/jetpack)** to your host PC.  In addition to flashing the Jetson with the latest Board Support Package (BSP), JetPack automatically installs tools for the host like CUDA Toolkit.  See the JetPack [Release Notes](https://developer.nvidia.com/embedded/jetpack-notes) for the full list of features and installed packages.
 
@@ -39,4 +39,4 @@ Please refer to the **[JetPack Install Guide](http://docs.nvidia.com/jetpack-l4t
 <p align="right">Next | <b><a href="building-repo.md">Building the Repo from Source</a></b>
 <br/>
 Back | <b><a href="digits-setup.md">DIGITS System Setup</a></p>
-</b><p align="center"><sup>© 2016-2019 NVIDIA | </sup><a href="../README.md#two-days-to-a-demo-training--inference"><sup>Table of Contents</sup></a></p>
+</b><p align="center"><sup>© 2016-2019 NVIDIA | </sup><a href="../README.md#two-days-to-a-demo-digits"><sup>Table of Contents</sup></a></p>
