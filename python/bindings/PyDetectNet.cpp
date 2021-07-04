@@ -24,6 +24,7 @@
 #include "PyDetectNet.h"
 
 #include "detectNet.h"
+#include "logging.h"
 
 #include "../../utils/python/bindings/PyCUDA.h"
 
@@ -63,7 +64,7 @@ typedef struct {
 // New
 static PyObject* PyDetection_New( PyTypeObject* type, PyObject* args, PyObject* kwds )
 {
-	printf(LOG_PY_INFERENCE "PyDetection_New()\n");
+	LogDebug(LOG_PY_INFERENCE "PyDetection_New()\n");
 	
 	// allocate a new container
 	PyDetection_Object* self = (PyDetection_Object*)type->tp_alloc(type, 0);
@@ -82,7 +83,7 @@ static PyObject* PyDetection_New( PyTypeObject* type, PyObject* args, PyObject* 
 // Init
 static int PyDetection_Init( PyDetection_Object* self, PyObject* args, PyObject* kwds )
 {
-	printf(LOG_PY_INFERENCE "PyDetection_Init()\n");
+	LogDebug(LOG_PY_INFERENCE "PyDetection_Init()\n");
 	
 	// parse arguments
 	int classID = 0;
@@ -119,7 +120,7 @@ static int PyDetection_Init( PyDetection_Object* self, PyObject* args, PyObject*
 // Deallocate
 static void PyDetection_Dealloc( PyDetection_Object* self )
 {
-	printf(LOG_PY_INFERENCE "PyDetection_Dealloc()\n");
+	LogDebug(LOG_PY_INFERENCE "PyDetection_Dealloc()\n");
 
 	// free the container
 	Py_TYPE(self)->tp_free((PyObject*)self);
@@ -404,6 +405,24 @@ static PyObject* PyDetection_GetCenter( PyDetection_Object* self, void* closure 
 	return tuple;
 }
 
+// GetROI
+static PyObject* PyDetection_GetROI( PyDetection_Object* self, void* closure )
+{
+	PyObject* left   = PyFloat_FromDouble(self->det.Left);
+	PyObject* top    = PyFloat_FromDouble(self->det.Top);
+	PyObject* right  = PyFloat_FromDouble(self->det.Right);
+	PyObject* bottom = PyFloat_FromDouble(self->det.Bottom);
+
+	PyObject* tuple = PyTuple_Pack(4, left, top, right, bottom);
+
+	Py_DECREF(left);
+	Py_DECREF(top);
+	Py_DECREF(right);
+	Py_DECREF(bottom);
+
+	return tuple;
+}
+
 static PyGetSetDef pyDetection_GetSet[] = 
 {
 	{ "Instance", (getter)PyDetection_GetInstance, (setter)PyDetection_SetInstance, "Instance index of the detected object", NULL},
@@ -412,11 +431,12 @@ static PyGetSetDef pyDetection_GetSet[] =
 	{ "Left", (getter)PyDetection_GetLeft, (setter)PyDetection_SetLeft, "Left bounding box coordinate", NULL},
 	{ "Right", (getter)PyDetection_GetRight, (setter)PyDetection_SetRight, "Right bounding box coordinate", NULL},
 	{ "Top", (getter)PyDetection_GetTop, (setter)PyDetection_SetTop, "Top bounding box coordinate", NULL},
-	{ "Bottom", (getter)PyDetection_GetBottom, (setter)PyDetection_SetBottom, "Bottom bounding box coordinate", NULL},
+	{ "Bottom", (getter)PyDetection_GetBottom, (setter)PyDetection_SetBottom, "Bottom bounding box coordinate", NULL},	
 	{ "Width", (getter)PyDetection_GetWidth, NULL, "Width of bounding box", NULL},
 	{ "Height", (getter)PyDetection_GetHeight, NULL, "Height of bounding box", NULL},
 	{ "Area", (getter)PyDetection_GetArea, NULL, "Area of bounding box", NULL},
 	{ "Center", (getter)PyDetection_GetCenter, NULL, "Center (x,y) coordinate of bounding box", NULL},
+	{ "ROI", (getter)PyDetection_GetROI, NULL, "Tuple containing the ROI as (Left, Top, Right, Bottom)", NULL},
 	{ NULL } /* Sentinel */
 };
 
@@ -459,7 +479,7 @@ typedef struct {
 // Init
 static int PyDetectNet_Init( PyDetectNet_Object* self, PyObject *args, PyObject *kwds )
 {
-	printf(LOG_PY_INFERENCE "PyDetectNet_Init()\n");
+	LogDebug(LOG_PY_INFERENCE "PyDetectNet_Init()\n");
 	
 	// parse arguments
 	PyObject* argList     = NULL;
@@ -477,7 +497,7 @@ static int PyDetectNet_Init( PyDetectNet_Object* self, PyObject *args, PyObject 
 	// determine whether to use argv or built-in network
 	if( argList != NULL && PyList_Check(argList) && PyList_Size(argList) > 0 )
 	{
-		printf(LOG_PY_INFERENCE "detectNet loading network using argv command line params\n");
+		LogDebug(LOG_PY_INFERENCE "detectNet loading network using argv command line params\n");
 
 		// parse the python list into char**
 		const size_t argc = PyList_Size(argList);
@@ -506,7 +526,7 @@ static int PyDetectNet_Init( PyDetectNet_Object* self, PyObject *args, PyObject 
 				return -1;
 			}
 
-			printf(LOG_PY_INFERENCE "detectNet.__init__() argv[%zu] = '%s'\n", n, argv[n]);
+			LogDebug(LOG_PY_INFERENCE "detectNet.__init__() argv[%zu] = '%s'\n", n, argv[n]);
 		}
 
 		// load the network using (argc, argv)
@@ -517,7 +537,7 @@ static int PyDetectNet_Init( PyDetectNet_Object* self, PyObject *args, PyObject 
 	}
 	else
 	{
-		printf(LOG_PY_INFERENCE "detectNet loading build-in network '%s'\n", network);
+		LogVerbose(LOG_PY_INFERENCE "detectNet loading build-in network '%s'\n", network);
 		
 		// parse the selected built-in network
 		detectNet::NetworkType networkType = detectNet::NetworkTypeFromStr(network);
@@ -525,7 +545,7 @@ static int PyDetectNet_Init( PyDetectNet_Object* self, PyObject *args, PyObject 
 		if( networkType == detectNet::CUSTOM )
 		{
 			PyErr_SetString(PyExc_Exception, LOG_PY_INFERENCE "detectNet invalid built-in network was requested");
-			printf(LOG_PY_INFERENCE "detectNet invalid built-in network was requested ('%s')\n", network);
+			LogError(LOG_PY_INFERENCE "detectNet invalid built-in network was requested ('%s')\n", network);
 			return -1;
 		}
 		
@@ -537,7 +557,7 @@ static int PyDetectNet_Init( PyDetectNet_Object* self, PyObject *args, PyObject 
 	if( !self->net )
 	{
 		PyErr_SetString(PyExc_Exception, LOG_PY_INFERENCE "detectNet failed to load network");
-		printf(LOG_PY_INFERENCE "detectNet failed to load built-in network '%s'\n", network);
+		LogError(LOG_PY_INFERENCE "detectNet failed to load network\n");
 		return -1;
 	}
 
@@ -569,36 +589,30 @@ static PyObject* PyDetectNet_Detect( PyDetectNet_Object* self, PyObject* args, P
 
 	int width = 0;
 	int height = 0;
-	const char* overlay = "box,labels,conf";
 
-	static char* kwlist[] = {"image", "width", "height", "overlay", NULL};
+	const char* overlay    = "box,labels,conf";
+	const char* format_str = "rgba32f";
+	static char* kwlist[]  = {"image", "width", "height", "overlay", "format", NULL};
 
-	if( !PyArg_ParseTupleAndKeywords(args, kwds, "Oii|s", kwlist, &capsule, &width, &height, &overlay))
+	if( !PyArg_ParseTupleAndKeywords(args, kwds, "O|iiss", kwlist, &capsule, &width, &height, &overlay, &format_str))
 	{
 		PyErr_SetString(PyExc_Exception, LOG_PY_INFERENCE "detectNet.Detect() failed to parse args tuple");
 		return NULL;
 	}
 
-	// verify dimensions
-	if( width <= 0 || height <= 0 )
-	{
-		PyErr_SetString(PyExc_Exception, LOG_PY_INFERENCE "detectNet.Detect() image dimensions are invalid");
-		return NULL;
-	}
+	// parse format string
+	imageFormat format = imageFormatFromStr(format_str);
 
 	// get pointer to image data
-	void* img = PyCUDA_GetPointer(capsule);
+	void* ptr = PyCUDA_GetImage(capsule, &width, &height, &format);
 
-	if( !img )
-	{
-		PyErr_SetString(PyExc_Exception, LOG_PY_INFERENCE "detectNet.Detect() failed to get image pointer from PyCapsule container");
+	if( !ptr )
 		return NULL;
-	}
 
 	// run the object detection
 	detectNet::Detection* detections = NULL;
 
-	const int numDetections = self->net->Detect((float*)img, width, height, &detections, detectNet::OverlayFlagsFromStr(overlay));
+	const int numDetections = self->net->Detect(ptr, width, height, format, &detections, detectNet::OverlayFlagsFromStr(overlay));
 
 	if( numDetections < 0 )
 	{
@@ -624,6 +638,80 @@ static PyObject* PyDetectNet_Detect( PyDetectNet_Object* self, PyObject* args, P
 	}
 
 	return list;
+}
+
+#define DOC_OVERLAY "Overlay a list of detections in an RGBA image.\n\n" \
+				 "Parameters:\n" \
+				 "  image   (capsule) -- CUDA memory capsule\n" \
+				 "  [Detections]   -- list containing the detected objects (see detectNet.Detection)" \
+				 "  width   (int)  -- width of the image (in pixels)\n" \
+				 "  height  (int)  -- height of the image (in pixels)\n" \
+				 "  overlay (str)  -- combination of box,labels,none flags (default is 'box')\n\n" \
+				 "Returns:\n" \
+				 "  None"
+
+// Overlay
+static PyObject* PyDetectNet_Overlay( PyDetectNet_Object* self, PyObject* args, PyObject *kwds )
+{
+	if( !self || !self->net )
+	{
+		PyErr_SetString(PyExc_Exception, LOG_PY_INFERENCE "detectNet invalid object instance");
+		return NULL;
+	}
+	
+	// parse arguments
+	PyObject* image_capsule = NULL;
+	PyObject* detections = NULL;
+
+	int width = 0;
+	int height = 0;
+
+	const char* overlay    = "box,labels,conf";
+	const char* format_str = "rgba32f";
+	static char* kwlist[]  = {"image", "detections", "width", "height", "overlay", "format", NULL};
+
+	if( !PyArg_ParseTupleAndKeywords(args, kwds, "OO|iiss", kwlist, &image_capsule, &detections, &width, &height, &overlay, &format_str))
+	{
+		PyErr_SetString(PyExc_Exception, LOG_PY_INFERENCE "detectNet.Detect() failed to parse args tuple");
+		return NULL;
+	}
+
+	// parse format string
+	imageFormat format = imageFormatFromStr(format_str);
+
+	// get pointer to image data
+	void* ptr = PyCUDA_GetImage(image_capsule, &width, &height, &format);
+
+	if( !ptr ) {
+		PyErr_SetString(PyExc_TypeError, LOG_PY_INFERENCE "failed to get cuda image");
+		return NULL;
+	}
+	
+	if ( !PyList_Check(detections) ) {
+		PyErr_SetString(PyExc_TypeError, LOG_PY_INFERENCE "detections should be of type list");
+		return NULL;
+	}
+
+	auto detections_ptr = std::vector<detectNet::Detection>();
+
+	for (Py_ssize_t i = 0; i < PyList_Size(detections); i++) {
+		PyObject *value = PyList_GetItem(detections, i);
+
+		if( PyObject_IsInstance(value, (PyObject*)&pyDetection_Type) != 1 ) {
+			PyErr_SetString(PyExc_TypeError, LOG_PY_INFERENCE "detections value should be of type jetson.inference.detectNet.Detection");
+			return NULL;
+		}
+		detections_ptr.push_back(((PyDetection_Object*)value)->det);
+	}
+
+	if (detections_ptr.size() > 0) {
+		if ( !self->net->Overlay(ptr, ptr, width, height, format, detections_ptr.data(), detections_ptr.size(), detectNet::OverlayFlagsFromStr(overlay)) ) {
+			PyErr_SetString(PyExc_Exception, LOG_PY_INFERENCE "detectNet.Overlay() encountered an error");
+			return NULL;
+		}
+	}
+
+	Py_RETURN_NONE;
 }
 
 
@@ -812,6 +900,7 @@ static PyTypeObject pyDetectNet_Type =
 static PyMethodDef pyDetectNet_Methods[] = 
 {
 	{ "Detect", (PyCFunction)PyDetectNet_Detect, METH_VARARGS|METH_KEYWORDS, DOC_DETECT},
+	{ "Overlay", (PyCFunction)PyDetectNet_Overlay, METH_VARARGS|METH_KEYWORDS, DOC_OVERLAY},
 	{ "GetThreshold", (PyCFunction)PyDetectNet_GetThreshold, METH_NOARGS, DOC_GET_THRESHOLD},
 	{ "SetThreshold", (PyCFunction)PyDetectNet_SetThreshold, METH_VARARGS, DOC_SET_THRESHOLD},     
 	{ "GetNumClasses", (PyCFunction)PyDetectNet_GetNumClasses, METH_NOARGS, DOC_GET_NUM_CLASSES},
@@ -845,7 +934,7 @@ bool PyDetectNet_Register( PyObject* module )
 
 	if( PyType_Ready(&pyDetection_Type) < 0 )
 	{
-		printf(LOG_PY_INFERENCE "detectNet.Detection PyType_Ready() failed\n");
+		LogError(LOG_PY_INFERENCE "detectNet.Detection PyType_Ready() failed\n");
 		return false;
 	}
 	
@@ -870,20 +959,20 @@ bool PyDetectNet_Register( PyObject* module )
 
 	if( !pyDetectNet_Type.tp_dict )
 	{
-		printf(LOG_PY_INFERENCE "detectNet failed to create new PyDict object\n");
+		LogError(LOG_PY_INFERENCE "detectNet failed to create new PyDict object\n");
 		return false;
 	}
 
 	if( PyDict_SetItemString(pyDetectNet_Type.tp_dict, "Detection", (PyObject*)&pyDetection_Type) < 0 )
 	{
-		printf(LOG_PY_INFERENCE "detectNet failed to register detectNet.Detection inner class\n");
+		LogError(LOG_PY_INFERENCE "detectNet failed to register detectNet.Detection inner class\n");
 		return false;
 	}
 
 	// complete registration of the detectNet type
 	if( PyType_Ready(&pyDetectNet_Type) < 0 )
 	{
-		printf(LOG_PY_INFERENCE "detectNet PyType_Ready() failed\n");
+		LogError(LOG_PY_INFERENCE "detectNet PyType_Ready() failed\n");
 		return false;
 	}
 	
@@ -891,7 +980,7 @@ bool PyDetectNet_Register( PyObject* module )
 
 	if( PyModule_AddObject(module, "detectNet", (PyObject*)&pyDetectNet_Type) < 0 )
 	{
-		printf(LOG_PY_INFERENCE "detectNet PyModule_AddObject('detectNet') failed\n");
+		LogError(LOG_PY_INFERENCE "detectNet PyModule_AddObject('detectNet') failed\n");
 		return false;
 	}
 	
